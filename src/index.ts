@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv'
-// import emailRoutes from './routes/emailRoutes';
+import emailRoutes from './routes/emailRoutes';
 
 
 dotenv.config();
@@ -12,7 +12,7 @@ app.use(express.json());
 
 
 
-// app.use('/api/emails', emailRoutes);
+app.use('/api/emails', emailRoutes);
 
 
 
