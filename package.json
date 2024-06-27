@@ -11,13 +11,16 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/express": "^4.17.21",
+    "@azure/msal-node": "^2.9.2",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "googleapis": "^140.0.1",
     "typescript": "^5.5.2"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.9",
     "nodemon": "^3.1.4",
     "ts-node": "^10.9.2"
   }
