@@ -1,5 +1,13 @@
 import { Request, Response } from 'express';
-import { google, gmail_v1 } from 'googleapis';
+import { google } from 'googleapis';
+import OpenAI from 'openai';
+
+
+require('dotenv').config();
+
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
 
 const googleOAuth = async (req: Request, res: Response) => {
     const oAuth2Client = new google.auth.OAuth2(
@@ -30,13 +38,14 @@ const googleOAuth = async (req: Request, res: Response) => {
     }
 };
 
+
 const fetchEmails = async (req: Request, res: Response) => {
     try {
-        // Get tokens from request headers in Postman
-        const accessToken = req.header('access_token'); // Assuming the access token is passed in the Authorization header
+        // Get tokens from request headers
+        const accessToken = req.header('access_token');
         const refreshToken = req.header('refresh_token');
         const expiryDate = req.header('expiry_date');
-        console.log(accessToken)
+        
         if (!accessToken || !refreshToken || !expiryDate) {
             return res.status(401).send('Access token, refresh token, or expiry date missing in headers.');
         }
@@ -50,21 +59,26 @@ const fetchEmails = async (req: Request, res: Response) => {
 
         // Set credentials from headers
         oAuth2Client.setCredentials({
-            access_token: req.headers['access_token'] as string,
-            refresh_token: req.headers['refresh_token'] as string,
-            expiry_date: Number(req.headers['expiry_date']),
+            access_token: accessToken!,
+            refresh_token: refreshToken!,
+            expiry_date: Number(expiryDate),
         });
 
         // Initialize Gmail API
         const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
-        // Example: Fetch unread emails
+        // Fetch unread emails from specific sender
         const gmailResponse = await gmail.users.messages.list({
             userId: 'me',
-            q: 'is:unread',
+            q: 'from:210108040@hbtu.ac.in is:unread', // Add the specific sender and unread filter
         });
 
         const messages = gmailResponse.data.messages || [];
+
+        if (messages.length === 0) {
+            console.log('No unread emails from the specified sender.');
+            return res.status(200).send('No unread emails from the specified sender.');
+        }
 
         // Process each email message
         for (const message of messages) {
@@ -75,18 +89,36 @@ const fetchEmails = async (req: Request, res: Response) => {
             });
 
             // Process the email content here
-            console.log('Email:', email.data.snippet); // Example: Log email snippet
+            // console.log('Email:', email.data.snippet); // Example: Log email snippet
+            const emailContent = email.data.snippet;
+            
+            const openaiResponse = await openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    { role: 'system', content: 'You are an email assistant.' },
+                    { role: 'user', content: `Analyze the following email content and determine the context:\n\n${emailContent}` }
+                ],
+            });
 
-            // Implement further processing or analysis here
+            const analysis = openaiResponse.choices[0].message?.content;
+            console.log('Analysis:', analysis);
+
+            
         }
+      
+       
+            
 
-        res.status(200).send('Emails fetched and processed.');
+        // res.status(200).send('Emails fetched and processed.');
+
+
     } catch (error) {
         console.error('Error fetching emails:', error);
         res.status(500).send('Error fetching emails.');
     }
 };
 
+export default fetchEmails;
 
 
 export { fetchEmails, googleOAuth};
