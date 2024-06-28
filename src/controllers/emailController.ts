@@ -102,7 +102,46 @@ const fetchEmails = async (req: Request, res: Response) => {
 
             const analysis = openaiResponse.choices[0].message?.content;
             console.log('Analysis:', analysis);
+            
+            let label = 'General';
+            if (analysis?.includes('urgent')) {
+                label = 'Urgent';
+            } else if (analysis?.includes('meeting')) {
+                label = 'Meeting';
+            }
 
+            await gmail.users.messages.modify({
+                userId: 'me',
+                id: message.id!,
+                requestBody: {
+                    addLabelIds: [label],
+                },
+            });
+
+            const reply = await openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    { role: 'system', content: 'You are an email assistant.' },
+                    { role: 'user', content: `Generate a reply for the following email content:\n\n${emailContent}` }
+                ],
+            });
+
+            const replyContent = reply.choices[0].message?.content;
+
+            const rawMessage = createEmail({
+                to: email.data.payload?.headers?.find(header => header.name === 'From')?.value!,
+                subject: 'Re: ' + email.data.payload?.headers?.find(header => header.name === 'Subject')?.value!,
+                message: replyContent!,
+            });
+
+            await gmail.users.messages.send({
+                userId: 'me',
+                requestBody: {
+                    raw: rawMessage,
+                },
+            });
+
+            res.status(200).send('Emails fetched, analyzed, labeled, and replied.');
             
         }
       
@@ -117,6 +156,24 @@ const fetchEmails = async (req: Request, res: Response) => {
         res.status(500).send('Error fetching emails.');
     }
 };
+
+
+function createEmail({ to, subject, message }: { to: string, subject: string, message: string }) {
+    const str = [
+        `To: ${to}`,
+        'Content-Type: text/html; charset=UTF-8',
+        'MIME-Version: 1.0',
+        `Subject: ${subject}`,
+        '',
+        message,
+    ].join('\n');
+
+    return Buffer.from(str)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
 
 export default fetchEmails;
 
